@@ -1,0 +1,6 @@
+# Ignore local todo data
+database/
+
+# Optional editor/system files
+.vscode/
+.DS_Store
