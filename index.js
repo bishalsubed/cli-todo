@@ -14,7 +14,16 @@ import {
     getSpecificPriorityTodos,
     getTodosByCategoryAndPriority
 } from "./todos.js"
-import { error } from "console";
+
+export const c = {
+    red: "\x1b[31m",
+    cyan: "\x1b[36m",
+    yellow: "\x1b[33m",
+    green: "\x1b[32m",
+    bold: "\x1b[1m",
+    dim: "\x1b[2m",
+    reset: "\x1b[0m"
+};
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -32,15 +41,89 @@ function displayArr(arr, columnWidth = 15, columns = 4) {
     }
 }
 
-export const c = {
-    red: "\x1b[31m",
-    cyan: "\x1b[36m",
-    yellow: "\x1b[33m",
-    green: "\x1b[32m",
-    bold: "\x1b[1m",
-    dim: "\x1b[2m",
-    reset: "\x1b[0m"
-};
+function displayCategories(data) {
+    let categories = [];
+    for (let i = 0; i < data.length; i++) {
+        categories.push(data[i].charAt(0).toUpperCase() + data[i].slice(1))
+    }
+    console.log(`${c.cyan}Your Existing Categories are:${c.reset}\n`)
+    displayArr(categories)
+}
+
+async function categorySelection(categoryData) {
+    displayCategories(categoryData)
+    console.log(`${c.yellow}Enter exit to abort${c.reset}\n`)
+    let category = (await rl.question('Insert any category from above: ')).toLowerCase();
+    if (category == "exit") return false;
+    if (category == "") {
+        return "default";
+    }
+    let doExit = false
+    while (!categoryData.includes(category)) {
+        console.log(`${c.yellow}No Such Category Exists${c.reset}`)
+        category = (await rl.question('Insert existing category from above: ')).toLowerCase;
+        if (category == "exit") {
+            doExit = true;
+            break;
+        } else if (category == "") {
+            return "default";
+        }
+    }
+    if (doExit == true) { return false }
+    else return category
+}
+
+async function prioritySelection() {
+    console.log(`${c.cyan}Priorities of the todo are:\n1) High\n2) Mid\n3) Low${c.reset}\n`)
+
+    console.log(`${c.yellow}Enter exit to abort it${c.reset}\n`)
+
+    let priority = (await rl.question(`Enter one of the priority from above: `)).toLowerCase();
+    if (priority == "exit") return false;
+    if (priority == "") {
+        return "default";
+    }
+    let doExit = false;
+    while (priority != "high" && priority != "mid" && priority != "low") {
+        console.log(`${c.yellow}No Such priority Exists${c.reset}`)
+        priority = await rl.question('Enter existing priority from above: ');
+        if (priority == "exit") {
+            doExit = true;
+            break;
+        } else if (priority == "") {
+            return "default";
+        }
+    }
+    if (doExit == true) { return false }
+    else return priority
+}
+
+async function obtainTodosData() {
+    let todo = await rl.question('Enter the todo: ');
+    while (todo.length < 4) {
+        console.log(`${c.red}The Todo must be atleast of 4 characters${c.reset}`)
+        todo = await rl.question('Enter the todo: ');
+    }
+    let data = await getCategories()
+    let category;
+    if (data.length <= 0) {
+        console.log("No categories found")
+        category = await rl.question(`Enter the category of todo  `);
+    } else {
+        displayCategories(data)
+        category = (await rl.question('Enter any category from above or new: ')).toLowerCase();
+        if (category == "") category = "personal"
+    }
+
+    let priority = await prioritySelection()
+    if (priority == "default") {
+        priority = "low"
+    } else if (priority == "exit") {
+        return false
+    }
+
+    return { todo, category, priority }
+}
 
 async function start() {
     console.log(`${c.cyan}Welcome To Our TODO app.\n\nHere you can add, delete, edit you todos.\nSave todos based on your categories and priorities.${c.reset}\n`)
@@ -52,41 +135,8 @@ async function start() {
             console.log(`${c.red}Closing the program${c.reset}`);
             break;
         } else if (key === "1") {
-            let todo = await rl.question('Enter the todo: ');
-            while (todo.length < 4) {
-                console.log(`${c.red}The Todo must be atleast of 4 characters${c.reset}`)
-                todo = await rl.question('Enter the todo: ');
-            }
-            let data = await getCategories()
-            let category;
-            if (data.length <= 0) {
-                console.log("No categories found")
-                category = await rl.question(`Enter the category of todo (${c.yellow}default:personal${c.reset}): `);
-            } else {
-                let categories = [];
-                for (let i = 0; i < data.length; i++) {
-                    categories.push(data[i].charAt(0).toUpperCase() + data[i].slice(1))
-                }
-                console.log(`${c.cyan}Your Existing Categories are:${c.reset}\n`)
-                displayArr(categories)
-                category = (await rl.question('Enter any category from above or new: ')).toLowerCase();
-            }
-            let priority = "low"
-            while (true) {
-                const priorityOpt = await rl.question('Priorities of the todo are:\n1) High priority\n2) Mid priority\n3) Low priority\n\nChoose one from above: ');
-                if (priorityOpt == "1") {
-                    priority = "high"
-                    break;
-                } else if (priorityOpt == "2") {
-                    priority = "mid"
-                    break;
-                } else if (priorityOpt == "3") {
-                    priority = "low"
-                    break;
-                } else {
-                    console.log(`${c.red}Invalid Input! Please choose from the below.${c.reset}\n`)
-                }
-            }
+            const { todo, category, priority } = await obtainTodosData()
+            if (!priority || !category || !todo) break;
             try {
                 await createTodo(todo, category.length > 0 ? category.toLowerCase() : "personal", priority)
                 console.log(`${c.green}Todo Created Successfully.\nPerform the next operation you would like.${c.reset}\n`)
@@ -104,7 +154,7 @@ async function start() {
                     break;
                 } else if (viewKey == "1") {
                     let allTodos = await getAllTodos();
-                    if (!allTodos) {
+                    if (!allTodos || allTodos.length == 0) {
                         console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
                     } else {
                         console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
@@ -114,24 +164,12 @@ async function start() {
                     if (data.length <= 0) {
                         console.log("No categories found")
                     } else {
-                        let categories = [];
-                        for (let i = 0; i < data.length; i++) {
-                            categories.push(data[i].charAt(0).toUpperCase() + data[i].slice(1))
+                        let category = await categorySelection(data)
+                        if (category == "default") {
+                            category = "personal"
+                        } else if (category == "exit") {
+                            break;
                         }
-                        console.log(`${c.cyan}Your Existing Categories are:${c.reset}\n`)
-                        displayArr(categories)
-                        console.log(`${c.yellow}Enter exit to abort${c.reset}\n`)
-                        let category = (await rl.question('Insert any category from above: ')).toLowerCase();
-                        let doExit = false
-                        while (!data.includes(category)) {
-                            console.log(`${c.yellow}No Such Category Exists${c.reset}`)
-                            category = (await rl.question('Insert existing category from above: ')).toLowerCase;
-                            if (category == "exit") {
-                                doExit = true
-                                break;
-                            }
-                        }
-                        if (doExit) break;
                         try {
                             let categoryTodos = await getSpecificCategoryTodos(category);
                             if (!categoryTodos) {
@@ -144,22 +182,12 @@ async function start() {
                         }
                     }
                 } else if (viewKey == "3") {
-                    console.log(`${c.yellow}Priorities of the todo are:\n1) High\n2) Mid\n3) Low${c.reset}\n`)
-
-                    console.log(`${c.yellow}Enter exit to abort it${c.reset}\n`)
-
-                    let viewPriority = (await rl.question('Enter one of the priority from above: ')).toLowerCase();
-                    if (viewPriority == "exit") break;
-                    let doExit = false;
-                    while (viewPriority != "high" && viewPriority != "mid" && viewPriority != "low") {
-                        console.log(`${c.yellow}No Such priority Exists${c.reset}`)
-                        viewPriority = await rl.question('Enter existing priority from above: ');
-                        if (viewPriority == "exit") {
-                            doExit = true;
-                            break;
-                        }
+                    let viewPriority = await prioritySelection()
+                    if (viewPriority == "default") {
+                        viewPriority = "low"
+                    } else if (viewPriority == "exit") {
+                        break;
                     }
-                    if (doExit) break;
                     try {
                         let priorityTodos = await getSpecificPriorityTodos(viewPriority);
                         if (!priorityTodos) {
@@ -175,47 +203,26 @@ async function start() {
                     if (categoryData.length <= 0) {
                         console.log("No categories found");
                         let allTodos = await getAllTodos();
-                        if (!allTodos) {
+                        if (!allTodos || allTodos.length == 0) {
                             console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
                         } else {
                             console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
                         }
                     } else {
-                        let categories = [];
-                        for (let i = 0; i < categoryData.length; i++) {
-                            categories.push(categoryData[i].charAt(0).toUpperCase() + categoryData[i].slice(1))
+                        let category = await categorySelection(data)
+                        if (category == "default") {
+                            category = "personal"
+                        } else if (category == "exit") {
+                            break;
                         }
-                        console.log(`${c.cyan}Your Existing Categories are:${c.reset}\n`)
-                        displayArr(categories)
-                        console.log(`${c.yellow}Enter exit to abort${c.reset}\n`)
-                        let category = (await rl.question('Insert any category from above: ')).toLowerCase();
-                        let doExit = false
-                        console.log("Category data", categoryData)
-                        while (!categoryData.includes(category)) {
-                            console.log(`${c.yellow}No Such Category Exists${c.reset}`)
-                            category = (await rl.question('Insert existing category from above: ')).toLowerCase;
-                            if (category == "exit") {
-                                doExit = true
-                                break;
-                            }
-                        }
-                        if (doExit) break;
-                        console.log(`${c.yellow}Priorities of the todo are:\n1) High\n2) Mid\n3) Low${c.reset}\n`)
 
-                        console.log(`${c.yellow}Enter exit to abort it${c.reset}\n`)
 
-                        let priority = (await rl.question('Enter one of the priority: ')).toLowerCase();
-                        if (priority == "exit") break;
-                        let doExitPriority = false;
-                        while (priority != "high" && priority != "mid" && priority != "low") {
-                            console.log(`${c.yellow}No Such priority Exists${c.reset}`)
-                            priority = await rl.question('Enter existing priority from above: ');
-                            if (priority == "exit") {
-                                doExitPriority = true;
-                                break;
-                            }
+                        let priority = await prioritySelection()
+                        if (priority == "default") {
+                            priority = "low"
+                        } else if (priority == "exit") {
+                            break;
                         }
-                        if (doExitPriority) break;
                         try {
                             let categoryPriorityTodos = await getTodosByCategoryAndPriority(category, priority);
                             if (!categoryPriorityTodos) {
@@ -256,7 +263,7 @@ async function start() {
             console.log(`${c.green}Successfully Exited View Mode${c.reset}`)
         } else if (key == "3") {
             let allTodos = await getAllTodos();
-            if (!allTodos) {
+            if (!allTodos || allTodos.length == 0) {
                 console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
                 break;
             } else {
@@ -297,60 +304,46 @@ async function start() {
             }
 
             let data = await getCategories()
-            let categories = [];
-            for (let i = 0; i < data.length; i++) {
-                categories.push(data[i].charAt(0).toUpperCase() + data[i].slice(1))
+            let category = await categorySelection(data)
+            if (category == "default") {
+                category = ""
+            } else if (category == "exit") {
+                break;
             }
-            console.log(`${c.cyan}Your Existing Categories are:${c.reset}\n`)
-            displayArr(categories)
-            let category = (await rl.question('Enter any category from above or new: ')).toLowerCase();
+
 
             if (category != "" && category != initialData.category) {
                 dataToBeEdited.category = category
             }
 
-            let priority = "low"
-            while (true) {
-                const priorityOpt = await rl.question('Priorities of the todo are:\n1) High priority\n2) Mid priority\n3) Low priority\n\nChoose one from above: ');
-                if (priorityOpt == "1") {
-                    priority = "high"
-                    break;
-                } else if (priorityOpt == "2") {
-                    priority = "mid"
-                    break;
-                } else if (priorityOpt == "3") {
-                    priority = "low"
-                    break;
-                } else if (priorityOpt == "") {
-                    priority = "";
-                    break;
-                }
-                else {
-                    console.log(`${c.red}Invalid Input! Please choose from the below.${c.reset}\n`)
-                }
+            let priority = await prioritySelection()
+            if (priority == "default") {
+                priority = ""
+            } else if (priority == "exit") {
+                break;
             }
 
             if (priority != "" && category != initialData.priority) {
                 dataToBeEdited.priority = priority
             }
 
-            const completeStatus = await rl.question('Have you completed this todo?[y/no]: ');
+            let completeStatus = await rl.question('Have you completed this todo?[y/no]: ');
 
             if (completeStatus == "yes" || completeStatus == "y") {
-                if(initialData.is_Completed == "no"){
+                if (initialData.is_Completed == "no") {
                     completeStatus = "yes"
-                }else{
+                } else {
                     completeStatus = ""
                 }
-            }else if(completeStatus == "no" || completeStatus == "n"){
-                if(initialData.is_Completed == "yes"){
+            } else if (completeStatus == "no" || completeStatus == "n") {
+                if (initialData.is_Completed == "yes") {
                     completeStatus = "no"
-                }else{
+                } else {
                     completeStatus = ""
                 }
-            }   
+            }
 
-            if(completeStatus != "" && completeStatus != todo.is_Completed){
+            if (completeStatus != "" && completeStatus != initialData.is_Completed) {
                 dataToBeEdited.is_Completed = completeStatus
             }
 
@@ -371,8 +364,9 @@ async function start() {
                     break;
                 } else if (deleteKey == "1") {
                     let allTodos = await getAllTodos();
-                    if (!allTodos) {
+                    if (!allTodos || allTodos.length == 0) {
                         console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
+                        break;
                     } else {
                         console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
                     }
@@ -417,47 +411,28 @@ async function start() {
                     }
 
                 } else if (deleteKey == "3") {
-                    console.log(`${c.yellow}Priorities of the todo are:\n1) High\n2) Mid\n3) Low${c.reset}\n`)
-
-                    console.log(`${c.yellow}Enter exit to abort it${c.reset}\n`)
-
-                    let deletePriority = (await rl.question('Enter one of the priority from above: ')).toLowerCase();
-                    if (deletePriority == "exit") break;
-                    let doExit = false;
-                    while (deletePriority != "high" && deletePriority != "mid" && deletePriority != "low") {
-                        console.log(`${c.yellow}No Such priority Exists${c.reset}`)
-                        deletePriority = await rl.question('Enter existing priority from above: ');
-                        if (deletePriority == "exit") {
-                            doExit = true;
-                            break;
-                        }
+                    let deletePriority = await prioritySelection()
+                    if (deletePriority == "default") {
+                        deletePriority = "low"
+                    } else if (deletePriority == "exit") {
+                        break;
                     }
-                    if (doExit) break;
-                    await deleteSpecificPriorityTodos(deletePriority)
-                    console.log(`${c.green}Successfully Deleted ${deletePriority[0].toUpperCase() + deletePriority.slice(1)} todos.\n${c.reset}`)
+                    try {
+                        await deleteSpecificPriorityTodos(deletePriority)
+                        console.log(`${c.green}Successfully Deleted ${deletePriority[0].toUpperCase() + deletePriority.slice(1)} todos.\n${c.reset}`)
+                    } catch (error) {
+                        console.log("Error deleting specific priority todos", error)
+                    }
                 } else if (deleteKey == "4") {
                     let data = await getCategories()
-                    let categories = [];
-                    for (let i = 0; i < data.length; i++) {
-                        categories.push(data[i].charAt(0).toUpperCase() + data[i].slice(1))
+                    let category = await categorySelection(data)
+                    if (category == "default") {
+                        category = "personal"
+                    } else if (category == "exit") {
+                        break;
                     }
-                    console.log(`${c.cyan}Your Existing Categories are:${c.reset}\n`)
-                    displayArr(categories)
-                    console.log(`${c.yellow}Enter exit to abort it${c.reset}\n`)
-                    let deleteCategory = (await rl.question('Enter specific category from above to delete: ')).toLowerCase();
-                    if (deleteCategory == "exit") break;
-                    let doExit = false
-                    while (!data.includes(deleteCategory)) {
-                        console.log(`${c.yellow}No Such Category Exists${c.reset}`)
-                        deleteCategory = await rl.question('Enter existing category from above: ');
-                        if (deleteCategory == "exit") {
-                            doExit = true;
-                            break;
-                        }
-                    }
-                    if (doExit) break;
-                    await deleteSpecificCategoryTodos(deleteCategory)
-                    console.log(`${c.green}Successfully Deleted ${deleteCategory} todos.\n${c.reset}`)
+                    await deleteSpecificCategoryTodos(category)
+                    console.log(`${c.green}Successfully Deleted ${category} todos.\n${c.reset}`)
                 } else {
                     console.log(`${c.red}Invalid Key! Please press a Valid key from below${c.reset}`)
                 }
