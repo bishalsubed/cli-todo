@@ -212,17 +212,17 @@ async function deleteSpecificCategoryTodos(category) {
 
     let data = await readFile(todosFile)
     let parsedData = JSON.parse(data)
+    let categoryDat = await getCategories()
+    let filterCategories = categoryDat.filter((elem) => elem != category)
+    let finalData = `${filterCategories.join("\n")}\n`
+    await createFile(createPath(constants.mainFolder, constants.categoryFile), finalData)
     if (parsedData.length <= 0) return false
-
+    
 
     let filtered = parsedData.filter(elem => elem.category != category)
 
     await createFile(todosFile, JSON.stringify(filtered, null, 2))
 
-    let categoryDat = await getCategories()
-    let filterCategories = categoryDat.filter((elem) => elem != category)
-    let finalData = `${filterCategories.join("\n")}\n`
-    await createFile(createPath(constants.mainFolder, constants.categoryFile), finalData)
     return true
 }
 
