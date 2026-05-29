@@ -54,7 +54,7 @@ async function categorySelection(categoryData) {
     displayCategories(categoryData)
     console.log(`${c.yellow}Enter exit to abort${c.reset}\n`)
     let category = (await rl.question('Insert any category from above: ')).toLowerCase();
-    if (category == "exit") return false;
+    if (category == "exit") return "exit";
     if (category == "") {
         return "default";
     }
@@ -69,7 +69,7 @@ async function categorySelection(categoryData) {
             return "default";
         }
     }
-    if (doExit == true) { return false }
+    if (doExit == true) { return "exit" }
     else return category
 }
 
@@ -79,7 +79,7 @@ async function prioritySelection() {
     console.log(`${c.yellow}Enter exit to abort it${c.reset}\n`)
 
     let priority = (await rl.question(`Enter one of the priority from above: `)).toLowerCase();
-    if (priority == "exit") return false;
+    if (priority == "exit") return "exit";
     if (priority == "") {
         return "default";
     }
@@ -94,7 +94,7 @@ async function prioritySelection() {
             return "default";
         }
     }
-    if (doExit == true) { return false }
+    if (doExit == true) { return "exit" }
     else return priority
 }
 
@@ -125,6 +125,190 @@ async function obtainTodosData() {
     return { todo, category, priority }
 }
 
+async function viewAllTodos() {
+    let allTodos = await getAllTodos();
+    if (!allTodos || allTodos.length == 0) {
+        console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
+    } else {
+        console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
+    }
+}
+
+async function viewSpecificCategoryTodos(data) {
+    let category = await categorySelection(data)
+    if (category == "default") {
+        category = "personal";
+    } else if (category == "exit") {
+        return false
+    }
+    try {
+        let categoryTodos = await getSpecificCategoryTodos(category);
+        if (!categoryTodos) {
+            console.log(`${c.yellow}Sorry You dont have ${category} todos${c.reset}\n`)
+        } else {
+            console.table(categoryTodos, ["todo", "priority", "is_Completed", "createdAt"])
+        }
+    } catch (error) {
+        console.log("Error while getting categorical todos", error)
+    }
+}
+
+async function viewSpecificPriorityTodos() {
+    let viewPriority = await prioritySelection()
+    if (viewPriority == "default") {
+        viewPriority = "low";
+    } else if (viewPriority == "exit") {
+        return false
+    }
+    try {
+        let priorityTodos = await getSpecificPriorityTodos(viewPriority);
+        if (!priorityTodos) {
+            console.log(`${c.yellow}Sorry You dont have ${viewPriority} priority todos${c.reset}`)
+        } else {
+            console.table(priorityTodos, ["todo", "category", "is_Completed", "createdAt"])
+        }
+    } catch (error) {
+        console.log("Error while getting priority todos", error)
+    }
+}
+
+async function viewSpecificCategoryPriorityTodos(categoryData) {
+    let category = await categorySelection(data)
+    if (category == "default") {
+        category = "personal"
+    } else if (category == "exit") {
+        return false
+    }
+
+    let priority = await prioritySelection()
+    if (priority == "default") {
+        priority = "low"
+    } else if (priority == "exit") {
+        return false
+    }
+
+    try {
+        let categoryPriorityTodos = await getTodosByCategoryAndPriority(category, priority);
+        if (!categoryPriorityTodos) {
+            console.log(`${c.yellow}Sorry You dont have ${"category"} todos of ${"priority"}${c.reset}`)
+        } else {
+            console.table(categoryPriorityTodos, ["todo", "is_Completed", "createdAt"])
+        }
+    } catch (error) {
+        console.log("Error while getting categorical todos of specific priority", error)
+    }
+}
+
+async function getEditedTodo() {
+    let allTodos = await getAllTodos();
+    if (!allTodos || allTodos.length == 0) {
+        console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
+        return false
+    } else {
+        console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
+    }
+
+    console.log("\nEnter exit to terminate")
+    let editIndex = (await rl.question('Enter the index(from table) of the todo to edit: '))
+    if (editIndex.toLowerCase() == "exit") return false;
+    let regex = /^[0-9]+$/;
+
+    let doExit = false
+    while (!regex.test(editIndex)) {
+        console.log(`${c.red}Please Input a valid Index or enter exit to terminate${c.reset}`);
+        editIndex = (await rl.question('Enter the valid index of the todo: '))
+        if (editIndex.toLowerCase() == "exit") {
+            doExit = true;
+            break
+        }
+    }
+    if (doExit) return false;
+    editIndex = Number(editIndex.replace(/^0+(?!$)/, ""))
+    if (editIndex >= allTodos.length) {
+        console.log("NO such Index exists")
+    }
+
+    let initialData = allTodos[editIndex]
+
+    let dataToBeEdited = {};
+
+    console.log(`${c.yellow}If you dont want to change just leave it as default${c.reset}`)
+
+    let todo = await rl.question('Enter the new todo: ');
+    while (todo.length < 4 && todo != "") {
+        console.log(`${c.red}The Todo must be atleast of 4 characters${c.reset}`)
+        todo = await rl.question('Enter the new todo: ');
+    }
+    if (todo != "" && todo != initialData) {
+        dataToBeEdited.todo = todo
+    }
+
+    let data = await getCategories()
+    let category = await categorySelection(data)
+    if (category == "default") {
+        category = ""
+    } else if (category == "exit") {
+        return false
+    }
+
+    if (category != "" && category != initialData.category) {
+        dataToBeEdited.category = category
+    }
+
+    let priority = await prioritySelection()
+    if (priority == "default") {
+        priority = ""
+    } else if (priority == "exit") {
+        return false
+    }
+
+    if (priority != "" && category != initialData.priority) {
+        dataToBeEdited.priority = priority
+    }
+
+    let completeStatus = await rl.question('Have you completed this todo?[y/no]: ');
+
+    if (completeStatus == "yes" || completeStatus == "y") {
+        if (initialData.is_Completed == "no") {
+            completeStatus = "yes"
+        } else {
+            completeStatus = ""
+        }
+    } else if (completeStatus == "no" || completeStatus == "n") {
+        if (initialData.is_Completed == "yes") {
+            completeStatus = "no"
+        } else {
+            completeStatus = ""
+        }
+    }
+
+    if (completeStatus != "" && completeStatus != initialData.is_Completed) {
+        dataToBeEdited.is_Completed = completeStatus
+    }
+    return { allTodos, editIndex, dataToBeEdited }
+}
+
+async function getSpecificDeleteIndex(allTodos) {
+    let deleteIndex = (await rl.question('Enter the index(from table) of the todo: '))
+    if (deleteIndex.toLowerCase() == "exit") return false;
+    let regex = /^[0-9]+$/;
+    let doExit = false;
+    while (!regex.test(deleteIndex)) {
+        console.log(`${c.red}Invalid Input! please Input a valid Index or exit to terminate${c.reset}`);
+        deleteIndex = (await rl.question('Enter the valid index of the todo: '))
+        if (deleteIndex.toLowerCase() == "exit") {
+            doExit = true;
+            break
+        }
+    }
+    if (doExit) return false;
+    deleteIndex = Number(deleteIndex.replace(/^0+(?!$)/, ""))
+    if (deleteIndex >= allTodos.length) {
+        console.log("NO such Index exists")
+    }
+    return deleteIndex
+}
+
 async function start() {
     console.log(`${c.cyan}Welcome To Our TODO app.\n\nHere you can add, delete, edit you todos.\nSave todos based on your categories and priorities.${c.reset}\n`)
 
@@ -145,7 +329,6 @@ async function start() {
             }
 
         } else if (key === "2") {
-            console.log(`\n${c.cyan}Welcome! View as well as modify/delete todos${c.reset}`)
             while (true) {
                 console.log(`\n${c.yellow}1) View All Todos\n2) View Specific Category Todos\n3) View Specific Priority Todos\n4) View Specific Category Todos of Specific Priority\n5) View Completed Todos\n6) View Incomplete Todos\n7) Exit${c.reset}\n`)
                 const viewKey = await rl.question('Insert one of the Key from above: ');
@@ -153,51 +336,18 @@ async function start() {
                     console.log(`${c.red}Exiting View Mode${c.reset}`)
                     break;
                 } else if (viewKey == "1") {
-                    let allTodos = await getAllTodos();
-                    if (!allTodos || allTodos.length == 0) {
-                        console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
-                    } else {
-                        console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
-                    }
+                    await viewAllTodos();
                 } else if (viewKey == "2") {
                     let data = await getCategories()
                     if (data.length <= 0) {
                         console.log("No categories found")
                     } else {
-                        let category = await categorySelection(data)
-                        if (category == "default") {
-                            category = "personal"
-                        } else if (category == "exit") {
-                            break;
-                        }
-                        try {
-                            let categoryTodos = await getSpecificCategoryTodos(category);
-                            if (!categoryTodos) {
-                                console.log(`${c.yellow}Sorry You dont have ${category} todos${c.reset}\n`)
-                            } else {
-                                console.table(categoryTodos, ["todo", "priority", "is_Completed", "createdAt"])
-                            }
-                        } catch (error) {
-                            console.log("Error while getting categorical todos", error)
-                        }
+                        let status = await viewSpecificCategoryTodos(data)
+                        if (!status) console.log(`${c.red}Exited${c.reset}`);
                     }
                 } else if (viewKey == "3") {
-                    let viewPriority = await prioritySelection()
-                    if (viewPriority == "default") {
-                        viewPriority = "low"
-                    } else if (viewPriority == "exit") {
-                        break;
-                    }
-                    try {
-                        let priorityTodos = await getSpecificPriorityTodos(viewPriority);
-                        if (!priorityTodos) {
-                            console.log(`${c.yellow}Sorry You dont have ${viewPriority} priority todos${c.reset}`)
-                        } else {
-                            console.table(priorityTodos, ["todo", "category", "is_Completed", "createdAt"])
-                        }
-                    } catch (error) {
-                        console.log("Error while getting priority todos", error)
-                    }
+                    let status = await viewSpecificPriorityTodos(data)
+                    if (!status) console.log(`${c.red}Exited${c.reset}`);
                 } else if (viewKey == "4") {
                     let categoryData = await getCategories()
                     if (categoryData.length <= 0) {
@@ -209,30 +359,8 @@ async function start() {
                             console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
                         }
                     } else {
-                        let category = await categorySelection(data)
-                        if (category == "default") {
-                            category = "personal"
-                        } else if (category == "exit") {
-                            break;
-                        }
-
-
-                        let priority = await prioritySelection()
-                        if (priority == "default") {
-                            priority = "low"
-                        } else if (priority == "exit") {
-                            break;
-                        }
-                        try {
-                            let categoryPriorityTodos = await getTodosByCategoryAndPriority(category, priority);
-                            if (!categoryPriorityTodos) {
-                                console.log(`${c.yellow}Sorry You dont have ${"category"} todos of ${"priority"}${c.reset}`)
-                            } else {
-                                console.table(categoryPriorityTodos, ["todo", "is_Completed", "createdAt"])
-                            }
-                        } catch (error) {
-                            console.log("Error while getting categorical todos of specific priority", error)
-                        }
+                        let status = await viewSpecificCategoryPriorityTodos(data)
+                        if (!status) console.log(`${c.red}Exited${c.reset}`);
                     }
                 } else if (viewKey == "5") {
                     try {
@@ -262,92 +390,13 @@ async function start() {
             }
             console.log(`${c.green}Successfully Exited View Mode${c.reset}`)
         } else if (key == "3") {
-            let allTodos = await getAllTodos();
-            if (!allTodos || allTodos.length == 0) {
-                console.log(`${c.yellow}Sorry You dont have any todos${c.reset}`)
-                break;
-            } else {
-                console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
-            }
-            console.log("\nEnter exit to terminate")
-            let editIndex = (await rl.question('Enter the index(from table) of the todo to edit: '))
-            if (editIndex.toLowerCase() == "exit") break;
-            let regex = /^[0-9]+$/;
-            let doExit = false;
-            while (!regex.test(editIndex)) {
-                console.log(`${c.red}Please Input a valid Index or enter exit to terminate${c.reset}`);
-                editIndex = (await rl.question('Enter the valid index of the todo: '))
-                if (editIndex.toLowerCase() == "exit") {
-                    doExit = true;
-                    break
-                }
-            }
-            if (doExit) break;
-            editIndex = Number(editIndex.replace(/^0+(?!$)/, ""))
-            if (editIndex >= allTodos.length) {
-                console.log("NO such Index exists")
-            }
-
-            let initialData = allTodos[editIndex]
-
-            let dataToBeEdited = {};
-
-            console.log(`${c.yellow}If you dont want to change just leave it as default${c.reset}`)
-
-            let todo = await rl.question('Enter the new todo: ');
-            while (todo.length < 4 && todo != "") {
-                console.log(`${c.red}The Todo must be atleast of 4 characters${c.reset}`)
-                todo = await rl.question('Enter the new todo: ');
-            }
-            if (todo != "" && todo != initialData) {
-                dataToBeEdited.todo = todo
-            }
-
-            let data = await getCategories()
-            let category = await categorySelection(data)
-            if (category == "default") {
-                category = ""
-            } else if (category == "exit") {
+            let data = await getEditedTodo()
+            console.log("Data", data)
+            let { allTodos, editIndex, dataToBeEdited } = await getEditedTodo()
+            if (!allTodos || !editIndex || !dataToBeEdited) {
+                console.log(`${c.red}Exited${c.reset}`);
                 break;
             }
-
-
-            if (category != "" && category != initialData.category) {
-                dataToBeEdited.category = category
-            }
-
-            let priority = await prioritySelection()
-            if (priority == "default") {
-                priority = ""
-            } else if (priority == "exit") {
-                break;
-            }
-
-            if (priority != "" && category != initialData.priority) {
-                dataToBeEdited.priority = priority
-            }
-
-            let completeStatus = await rl.question('Have you completed this todo?[y/no]: ');
-
-            if (completeStatus == "yes" || completeStatus == "y") {
-                if (initialData.is_Completed == "no") {
-                    completeStatus = "yes"
-                } else {
-                    completeStatus = ""
-                }
-            } else if (completeStatus == "no" || completeStatus == "n") {
-                if (initialData.is_Completed == "yes") {
-                    completeStatus = "no"
-                } else {
-                    completeStatus = ""
-                }
-            }
-
-            if (completeStatus != "" && completeStatus != initialData.is_Completed) {
-                dataToBeEdited.is_Completed = completeStatus
-            }
-
-
             try {
                 await editTodo(allTodos, allTodos[editIndex].tid, dataToBeEdited)
                 console.log(`${c.cyan}Successfully edited${c.reset}`)
@@ -371,24 +420,11 @@ async function start() {
                         console.table(allTodos, ["todo", "category", "priority", "is_Completed", "createdAt"])
                     }
                     console.log("\nEnter exit to terminate")
-                    let deleteIndex = (await rl.question('Enter the index(from table) of the todo: '))
-                    if (deleteIndex.toLowerCase() == "exit") break;
-                    let regex = /^[0-9]+$/;
-                    let doExit = false;
-                    while (!regex.test(deleteIndex)) {
-                        console.log(`${c.red}Invalid Input! please Input a valid Index or exit to terminate${c.reset}`);
-                        deleteIndex = (await rl.question('Enter the valid index of the todo: '))
-                        if (deleteIndex.toLowerCase() == "exit") {
-                            doExit = true;
-                            break
-                        }
+                    let deleteIndex = await getSpecificDeleteIndex(allTodos);
+                    if (deleteIndex == false) {
+                        console.log(`${c.red}Exited${c.reset}`);
+                        break;
                     }
-                    if (doExit) break;
-                    deleteIndex = Number(deleteIndex.replace(/^0+(?!$)/, ""))
-                    if (deleteIndex >= allTodos.length) {
-                        console.log("NO such Index exists")
-                    }
-
                     try {
                         await deleteTodo(allTodos[deleteIndex].tid)
                         console.log(`${c.cyan}Successfully deleted${c.reset}`)
